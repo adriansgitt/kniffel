@@ -62,7 +62,7 @@
   /* Würfel */
   .dice-area { text-align: center; margin-top: 15px; padding: 15px 0; }
   .dice-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
-  .die { width: 72px; height: 72px; font-size: 3.2em; line-height: 72px; text-align: center; border: 3px solid #999; border-radius: 14px; background: white; cursor: pointer; user-select: none; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
+  .die { width: 75px; height: 75px; font-size: 3.8em; line-height: 75px; text-align: center; border: 3px solid #999; border-radius: 12px; background: white; cursor: pointer; user-select: none; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
   .die.kept { background: #FFEB3B; border-color: #F9A825; }
   .die.empty { color: #ccc; }
   .btn-roll { background: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 1.1em; font-weight: bold; border-radius: 10px; cursor: pointer; }
@@ -159,6 +159,7 @@
 </div>
 
 <!-- Lobby -->
+<div id="lobby" class="screen">
   <h1>🎲 Lobby</h1>
   <p>Raum-Code:</p>
   <div class="lobby-code" id="lobbyCode"></div>
@@ -502,6 +503,7 @@ function showEnd() {
   // Scores in Bestenliste speichern
   if (window.fbDb) {
     res.forEach(r => {
+      if (/^Spieler \d+$/.test(r.name)) return;
       const entry = {
         name: r.name,
         score: r.score,
