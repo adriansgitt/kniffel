@@ -60,9 +60,9 @@
   .round-info { text-align: center; font-size: 0.9em; color: #666; margin-bottom: 8px; }
 
   /* Würfel */
-  .dice-area { text-align: center; margin-bottom: 10px; }
-  .dice-row { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
-  .die { width: 62px; height: 62px; font-size: 2.8em; line-height: 62px; text-align: center; border: 3px solid #999; border-radius: 12px; background: white; cursor: pointer; user-select: none; transition: all 0.15s; }
+  .dice-area { text-align: center; margin-top: 15px; padding: 15px 0; }
+  .dice-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
+  .die { width: 72px; height: 72px; font-size: 3.2em; line-height: 72px; text-align: center; border: 3px solid #999; border-radius: 14px; background: white; cursor: pointer; user-select: none; transition: all 0.15s; display: flex; align-items: center; justify-content: center; }
   .die.kept { background: #FFEB3B; border-color: #F9A825; }
   .die.empty { color: #ccc; }
   .btn-roll { background: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 1.1em; font-weight: bold; border-radius: 10px; cursor: pointer; }
@@ -81,7 +81,7 @@
   .scorecard td.preview:hover { background: #bbdefb; }
   .scorecard td.active-player { background: #e8f0fe; }
   .scorecard td.scored { color: #333; }
-  .scorecard td.last-scored { background: #e8f5e9; color: #2E7D32; font-weight: bold; }
+  .scorecard td.last-scored { color: #E65100; font-weight: bold; }
 
   /* Status */
   .status { text-align: center; font-size: 0.9em; color: #888; margin-top: 8px; min-height: 1.2em; }
@@ -161,15 +161,15 @@
 <div id="game" class="screen">
   <div class="current-player" id="currentPlayer"></div>
   <div class="round-info" id="roundInfo"></div>
+  <div class="score-scroll">
+    <table class="scorecard" id="scorecard"></table>
+  </div>
+  <div class="status" id="status"></div>
   <div class="dice-area">
     <div class="dice-row" id="diceRow"></div>
     <button class="btn-roll" id="btnRoll" onclick="roll()">🎲 Würfeln</button>
     <div class="rolls-left" id="rollsLeft"></div>
   </div>
-  <div class="score-scroll">
-    <table class="scorecard" id="scorecard"></table>
-  </div>
-  <div class="status" id="status"></div>
 </div>
 
 <!-- Endscreen -->
@@ -340,7 +340,8 @@ function chooseCategory(kat) {
       round: nextRound,
       dice: [0,0,0,0,0],
       kept: [false,false,false,false,false],
-      rolls: 0
+      rolls: 0,
+      lastScored: { player: currentPlayer, category: kat }
     });
   } else {
     currentPlayer = nextPlayer;
@@ -590,6 +591,7 @@ function startOnlineRound(data) {
   dice = data.dice || [0,0,0,0,0];
   kept = data.kept || [false,false,false,false,false];
   rolls = data.rolls || 0;
+  if (data.lastScored) lastScoredEntry = data.lastScored;
   if (round > 13) { showEnd(); return; }
   showScreen('game');
   renderAll();
