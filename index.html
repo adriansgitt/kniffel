@@ -13,13 +13,13 @@
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyAhPX0xOVsnb2yjQQ4JEYsA2ND7rawxg6Q",
+    apiKey: "<api_key>",
     authDomain: "kniffel-48521.firebaseapp.com",
     databaseURL: "https://kniffel-48521-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "kniffel-48521",
     storageBucket: "kniffel-48521.firebasestorage.app",
     messagingSenderId: "993583803368",
-    appId: "1:993583803368:web:f3c9100b3d0cf015d0d25d",
+    appId: "<app_id>",
     measurementId: "G-4YFEPP56X2"
   };
 
@@ -466,6 +466,14 @@ function setStatus(text) {
 function showEnd() {
   showScreen('end');
   sndEnd();
+  // Online-Raum nach 60s löschen
+  if (gameMode === 'online' && roomCode) {
+    if (fbListener) { fbListener(); fbListener = null; }
+    setTimeout(() => {
+      fbRemove(fbRef(fbDb, `games/${roomCode}`));
+      roomCode = null;
+    }, 60000);
+  }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt }));
   res.sort((a, b) => b.score - a.score);
   const div = document.getElementById('results');
@@ -503,6 +511,7 @@ function createOnlineGame() {
   const roomRef = fbRef(fbDb, `games/${roomCode}`);
   fbSet(roomRef, {
     status: 'waiting',
+    createdAt: Date.now(),
     players: [{ name, scores: {} }]
   }).then(() => {
     showScreen('lobby');
@@ -601,6 +610,22 @@ function leaveLobby() {
   roomCode = null;
   showMenu();
 }
+
+// Alte Räume aufräumen (älter als 1 Stunde)
+function cleanupOldRooms() {
+  const gamesRef = fbRef(fbDb, 'games');
+  fbGet(gamesRef).then(snap => {
+    if (!snap.exists()) return;
+    const now = Date.now();
+    snap.forEach(child => {
+      const data = child.val();
+      if (data.createdAt && now - data.createdAt > 3600000) {
+        fbRemove(fbRef(fbDb, `games/${child.key}`));
+      }
+    });
+  });
+}
+setTimeout(cleanupOldRooms, 3000);
 
 // Init
 initMenu();
