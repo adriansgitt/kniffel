@@ -52,7 +52,7 @@
   .player-count button.selected { background: #1565C0; color: white; border-color: #1565C0; }
   .name-inputs { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; width: 100%; max-width: 250px; }
   .name-inputs input { padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 1em; }
-  .btn-start { background: #4CAF50; color: white; border: none; padding: 14px 40px; font-size: 1.2em; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 15px; }
+  .btn-start { background: #4CAF50; color: white; border: none; padding: 14px 40px; font-size: 1.2em; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 15px; width: 100%; max-width: 250px; }
 
   /* Spielfeld */
   #game { padding: 10px; width: 100%; max-width: 500px; margin: 0 auto; }
@@ -81,7 +81,7 @@
   .scorecard td.preview:hover { background: #bbdefb; }
   .scorecard td.active-player { background: #e8f0fe; }
   .scorecard td.scored { color: #333; }
-  .scorecard td.last-scored { color: #E65100; font-weight: bold; }
+  .scorecard td.last-scored { color: #D32F2F; }
 
   /* Status */
   .status { text-align: center; font-size: 0.9em; color: #888; margin-top: 8px; min-height: 1.2em; }
@@ -114,6 +114,18 @@
   .btn-lobby { background: #1565C0; color: white; border: none; padding: 12px 30px; font-size: 1.1em; font-weight: bold; border-radius: 10px; cursor: pointer; margin: 8px; }
   .btn-lobby:disabled { background: #aaa; }
   .btn-back { background: #888; color: white; border: none; padding: 10px 24px; font-size: 1em; border-radius: 10px; cursor: pointer; margin-top: 15px; }
+
+  /* Bestenliste */
+  #leaderboard { justify-content: flex-start; min-height: 100vh; padding-top: 40px; }
+  .lb-table { width: 100%; max-width: 400px; border-collapse: collapse; margin: 15px 0; font-size: 0.95em; }
+  .lb-table th, .lb-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+  .lb-table th { background: #e3eaf2; font-weight: bold; }
+  .lb-table td:nth-child(1) { width: 30px; text-align: center; }
+  .lb-table td:nth-child(3) { text-align: right; font-weight: bold; }
+  .lb-table td:nth-child(4) { font-size: 0.8em; color: #888; }
+  .lb-table tr:nth-child(-n+3) td:nth-child(1) { font-size: 1.2em; }
+  .btn-menu { background: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 1.1em; font-weight: bold; border-radius: 10px; cursor: pointer; margin: 8px; }
+  .btn-leaderboard { background: #FF9800; color: white; border: none; padding: 10px 40px; font-size: 1em; font-weight: bold; border-radius: 12px; cursor: pointer; margin-top: 10px; width: 100%; max-width: 250px; }
 </style>
 </head>
 <body>
@@ -121,12 +133,11 @@
 <!-- Startmenü -->
 <div id="menu" class="screen active">
   <h1>🎲 Kniffel</h1>
-  <h2>Spielmodus</h2>
   <div class="mode-select" id="modeSelect">
     <button class="selected" onclick="sndClick(); selectMode('local')">📱 Lokal</button>
     <button onclick="sndClick(); selectMode('online')">🌐 Online</button>
   </div>
-  <div id="localSetup">
+  <div id="localSetup" style="display:flex; flex-direction:column; align-items:center;">
     <h2>Wie viele Spieler?</h2>
     <div class="player-count" id="playerCount"></div>
     <div class="name-inputs" id="nameInputs"></div>
@@ -144,10 +155,10 @@
     <br>
     <button class="btn-lobby" onclick="sndStart(); joinOnlineGame()">Spiel beitreten</button>
   </div>
+  <button class="btn-leaderboard" onclick="sndClick(); showLeaderboard()">🏆 Bestenliste</button>
 </div>
 
 <!-- Lobby -->
-<div id="lobby" class="screen">
   <h1>🎲 Lobby</h1>
   <p>Raum-Code:</p>
   <div class="lobby-code" id="lobbyCode"></div>
@@ -170,6 +181,13 @@
     <button class="btn-roll" id="btnRoll" onclick="roll()">🎲 Würfeln</button>
     <div class="rolls-left" id="rollsLeft"></div>
   </div>
+</div>
+
+<!-- Bestenliste -->
+<div id="leaderboard" class="screen">
+  <h1>🏆 Bestenliste</h1>
+  <table class="lb-table" id="lbTable"></table>
+  <button class="btn-back" onclick="showMenu()">← Zurück</button>
 </div>
 
 <!-- Endscreen -->
@@ -433,7 +451,7 @@ function categoryRow(kat) {
     if (kat in sc) {
       const isLast = lastScoredEntry && lastScoredEntry.player === si && lastScoredEntry.category === kat;
       html += `<td class="scored${isLast ? ' last-scored' : ''}">${sc[kat]}</td>`;
-    } else if (si === currentPlayer && rolls > 0) {
+    } else if (si === currentPlayer && rolls > 0 && (gameMode === 'local' || si === myPlayerId)) {
       const preview = calcScore(dice, kat);
       html += `<td class="preview" onclick="chooseCategory('${kat}')">(${preview})</td>`;
     } else {
@@ -481,6 +499,18 @@ function showEnd() {
   }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt }));
   res.sort((a, b) => b.score - a.score);
+  // Scores in Bestenliste speichern
+  if (window.fbDb) {
+    res.forEach(r => {
+      const entry = {
+        name: r.name,
+        score: r.score,
+        date: new Date().toLocaleString('de-DE')
+      };
+      const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+      fbSet(newRef, entry);
+    });
+  }
   const div = document.getElementById('results');
   div.innerHTML = '';
   res.forEach((r, i) => {
@@ -615,6 +645,29 @@ function leaveLobby() {
   if (roomCode && isHost) fbRemove(fbRef(fbDb, `games/${roomCode}`));
   roomCode = null;
   showMenu();
+}
+
+function showLeaderboard() {
+  showScreen('leaderboard');
+  const table = document.getElementById('lbTable');
+  table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Laden...</td></tr>';
+  if (!window.fbDb) { setTimeout(showLeaderboard, 500); return; }
+  fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
+    if (!snap.exists()) {
+      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Noch keine Einträge</td></tr>';
+      return;
+    }
+    const entries = [];
+    snap.forEach(child => entries.push(child.val()));
+    entries.sort((a, b) => b.score - a.score);
+    const top = entries.slice(0, 50);
+    const medals = ['🥇','🥈','🥉'];
+    let html = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr>';
+    top.forEach((e, i) => {
+      html += `<tr><td>${medals[i] || (i+1)}</td><td>${e.name}</td><td>${e.score}</td><td>${e.date}</td></tr>`;
+    });
+    table.innerHTML = html;
+  });
 }
 
 // Alte Räume aufräumen (älter als 1 Stunde)
