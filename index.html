@@ -525,7 +525,7 @@ function showEnd() {
         fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
           if (!snap.exists()) return;
           const keys = [];
-          snap.forEach(child => keys.push({ key: child.key, score: child.val().score }));
+          snap.forEach(child => { keys.push({ key: child.key, score: child.val().score }); });
           if (keys.length <= 50) return;
           keys.sort((a, b) => b.score - a.score);
           keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
@@ -681,7 +681,7 @@ function renderLeaderboard(snap) {
     return;
   }
   const entries = [];
-  snap.forEach(child => entries.push(child.val()));
+  snap.forEach(child => { entries.push(child.val()); });
   console.log('Entries:', JSON.stringify(entries));
   entries.sort((a, b) => b.score - a.score);
   const top = entries.slice(0, 50);
