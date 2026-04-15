@@ -520,6 +520,17 @@ function showEnd() {
         const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
         fbSet(newRef, entry);
       });
+      // Cleanup: nach dem Speichern Einträge über 50 löschen
+      setTimeout(() => {
+        fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
+          if (!snap.exists()) return;
+          const keys = [];
+          snap.forEach(child => keys.push({ key: child.key, score: child.val().score }));
+          if (keys.length <= 50) return;
+          keys.sort((a, b) => b.score - a.score);
+          keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
+        });
+      }, 2000);
     }
     saveToLeaderboard();
   }
@@ -670,19 +681,13 @@ function showLeaderboard() {
   if (fbLeaderboardListener) fbLeaderboardListener();
   fbLeaderboardListener = fbOnValue(fbRef(fbDb, 'leaderboard'), snap => {
     if (!snap.exists()) {
-      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Noch keine Eintr\u00e4ge</td></tr>';
+      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Noch keine Einträge</td></tr>';
       return;
     }
     const entries = [];
     snap.forEach(child => entries.push(child.val()));
     entries.sort((a, b) => b.score - a.score);
     const top = entries.slice(0, 50);
-    if (entries.length > 50) {
-      const keys = [];
-      snap.forEach(child => keys.push({ key: child.key, val: child.val() }));
-      keys.sort((a, b) => b.val.score - a.val.score);
-      keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
-    }
     const medals = ['🥇','🥈','🥉'];
     let html = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr>';
     top.forEach((e, i) => {
