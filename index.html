@@ -188,7 +188,7 @@
 <div id="leaderboard" class="screen">
   <h1>🏆 Bestenliste</h1>
   <table class="lb-table" id="lbTable"></table>
-  <button class="btn-back" onclick="showMenu()">← Zurück</button>
+  <button class="btn-back" onclick="if(fbLeaderboardListener){fbLeaderboardListener();fbLeaderboardListener=null;} showMenu()">← Zurück</button>
 </div>
 
 <!-- Endscreen -->
@@ -288,7 +288,7 @@ function startGame() {
     playerNames.push(document.getElementById(`name${i}`).value.trim() || `Spieler ${i+1}`);
     scorecards.push({});
   }
-  currentPlayer = 0;
+  currentPlayer = Math.floor(Math.random() * numPlayers);
   round = 1;
   newTurn();
 }
@@ -506,17 +506,12 @@ function showEnd() {
   }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt }));
   res.sort((a, b) => b.score - a.score);
-  // Scores in Bestenliste speichern (nur Top 30)
-  if (window.fbDb && !window._leaderboardSaved) {
-    window._leaderboardSaved = true;
-    fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
-      const entries = [];
-      if (snap.exists()) snap.forEach(child => entries.push(child.val()));
-      entries.sort((a, b) => b.score - a.score);
-      const minTop = entries.length >= 50 ? entries[49].score : 0;
+  // Scores in Bestenliste speichern (lokal immer, online nur Host)
+  if (gameMode === 'local' || isHost) {
+    function saveToLeaderboard() {
+      if (!window.fbDb) { setTimeout(saveToLeaderboard, 500); return; }
       res.forEach(r => {
-        if (/^Spieler(\s\d+)?$/.test(r.name)) return;
-        if (r.score < minTop && entries.length >= 50) return;
+        if (/^Spieler(\s\d+)?$/.test(r.name) || !r.name.trim()) return;
         const entry = {
           name: r.name,
           score: r.score,
@@ -525,7 +520,8 @@ function showEnd() {
         const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
         fbSet(newRef, entry);
       });
-    });
+    }
+    saveToLeaderboard();
   }
   const div = document.getElementById('results');
   div.innerHTML = '';
@@ -618,7 +614,7 @@ function startOnlineGame() {
     const data = snap.val();
     fbUpdate(roomRef, {
       status: 'playing',
-      currentPlayer: 0,
+      currentPlayer: Math.floor(Math.random() * data.players.length),
       round: 1,
       dice: [0,0,0,0,0],
       kept: [false,false,false,false,false],
@@ -664,21 +660,23 @@ function leaveLobby() {
   showMenu();
 }
 
+let fbLeaderboardListener = null;
+
 function showLeaderboard() {
   showScreen('leaderboard');
   const table = document.getElementById('lbTable');
   table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Laden...</td></tr>';
   if (!window.fbDb) { setTimeout(showLeaderboard, 500); return; }
-  fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
+  if (fbLeaderboardListener) fbLeaderboardListener();
+  fbLeaderboardListener = fbOnValue(fbRef(fbDb, 'leaderboard'), snap => {
     if (!snap.exists()) {
-      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Noch keine Einträge</td></tr>';
+      table.innerHTML = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr><tr><td colspan="4" style="text-align:center;color:#888;">Noch keine Eintr\u00e4ge</td></tr>';
       return;
     }
     const entries = [];
     snap.forEach(child => entries.push(child.val()));
     entries.sort((a, b) => b.score - a.score);
     const top = entries.slice(0, 50);
-    // Alte Einträge außerhalb Top 50 löschen
     if (entries.length > 50) {
       const keys = [];
       snap.forEach(child => keys.push({ key: child.key, val: child.val() }));
