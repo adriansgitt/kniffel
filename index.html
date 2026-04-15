@@ -386,10 +386,11 @@ function chooseCategory(kat) {
 
   if (gameMode === 'online') {
     const players = playerNames.map((n, idx) => ({ name: n, scores: scorecards[idx] }));
+    const gameOver = players.every(p => Object.keys(p.scores).length >= 13);
     fbUpdate(fbRef(fbDb, `games/${roomCode}`), {
       players,
       currentPlayer: nextPlayer,
-      round: nextRound,
+      round: gameOver ? 14 : nextRound,
       dice: [0,0,0,0,0],
       kept: [false,false,false,false,false],
       rolls: 0,
@@ -398,7 +399,7 @@ function chooseCategory(kat) {
   } else {
     currentPlayer = nextPlayer;
     round = nextRound;
-    if (round > 13) {
+    if (isGameOver()) {
       showEnd();
     } else {
       newTurn();
@@ -433,7 +434,9 @@ function getTotal(si) {
   return { oben, bonus, unten, gesamt: oben + bonus + unten };
 }
 
-// Rendering
+function isGameOver() {
+  return scorecards.every(sc => Object.keys(sc).length >= 13);
+}
 function renderAll() {
   renderDice();
   renderScorecard();
@@ -510,7 +513,7 @@ function totalRow() {
   let html = '<tr class="total-row"><td>GESAMT</td>';
   for (let si = 0; si < numPlayers; si++) {
     const t = getTotal(si);
-    html += `<td>${t.unten} + ${t.oben + t.bonus} = ${t.gesamt}</td>`;
+    html += `<td><span style="color:#999">${t.unten} + ${t.oben + t.bonus} = </span>${t.gesamt}</td>`;
   }
   html += '</tr>';
   return html;
