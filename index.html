@@ -473,7 +473,7 @@ function bonusRow() {
   let html = '<tr class="bonus-row"><td>Bonus (≥63)</td>';
   for (let si = 0; si < numPlayers; si++) {
     const t = getTotal(si);
-    html += `<td>${t.bonus ? '35' : `(${t.oben}/63)`}</td>`;
+    html += `<td>${t.oben}/63 ${t.bonus ? '+ 35' : ''}</td>`;
   }
   html += '</tr>';
   return html;
@@ -482,7 +482,8 @@ function bonusRow() {
 function totalRow() {
   let html = '<tr class="total-row"><td>GESAMT</td>';
   for (let si = 0; si < numPlayers; si++) {
-    html += `<td>${getTotal(si).gesamt}</td>`;
+    const t = getTotal(si);
+    html += `<td>${t.unten} + ${t.oben + t.bonus} = ${t.gesamt}</td>`;
   }
   html += '</tr>';
   return html;
