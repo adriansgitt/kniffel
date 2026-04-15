@@ -225,6 +225,8 @@ function sndScore() { playTone(523, 0.12, 'sine', 0.15); setTimeout(() => playTo
 function sndStart() { [523,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.15, 'sine', 0.13), i*100)); }
 function sndEnd() { [784,659,784,1047].forEach((f,i) => setTimeout(() => playTone(f, 0.25, 'triangle', 0.15), i*150)); }
 
+function sndMyTurn() { playTone(523, 0.15, 'sine', 0.13); setTimeout(() => playTone(784, 0.2, 'sine', 0.13), 150); }
+
 const DICE_FACES = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
 const UPPER = ['Einser','Zweier','Dreier','Vierer','Fünfer','Sechser'];
 const LOWER = ['Dreierpasch','Viererpasch','Full House','Kleine Straße','Große Straße','Kniffel','Chance'];
@@ -271,6 +273,9 @@ function showScreen(id) {
 
 function showMenu() {
   numPlayers = 1;
+  gameMode = 'local';
+  window._leaderboardSaved = false;
+  if (fbListener) { fbListener(); fbListener = null; }
   showScreen('menu');
   initMenu();
 }
@@ -501,16 +506,17 @@ function showEnd() {
   }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt }));
   res.sort((a, b) => b.score - a.score);
-  // Scores in Bestenliste speichern (nur Top 3)
-  if (window.fbDb) {
+  // Scores in Bestenliste speichern (nur Top 30)
+  if (window.fbDb && !window._leaderboardSaved) {
+    window._leaderboardSaved = true;
     fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
       const entries = [];
       if (snap.exists()) snap.forEach(child => entries.push(child.val()));
       entries.sort((a, b) => b.score - a.score);
-      const minTop = entries.length >= 30 ? entries[29].score : 0;
+      const minTop = entries.length >= 50 ? entries[49].score : 0;
       res.forEach(r => {
         if (/^Spieler(\s\d+)?$/.test(r.name)) return;
-        if (r.score <= minTop && entries.length >= 30) return;
+        if (r.score < minTop && entries.length >= 50) return;
         const entry = {
           name: r.name,
           score: r.score,
@@ -632,10 +638,11 @@ function startOnlineRound(data) {
   kept = data.kept || [false,false,false,false,false];
   rolls = data.rolls || 0;
   if (data.lastScored) lastScoredEntry = data.lastScored;
-  if (round > 13) { showEnd(); return; }
+  if (round > 13) { showEnd(); if (fbListener) { fbListener(); fbListener = null; } return; }
   showScreen('game');
   renderAll();
   const isMyTurn = currentPlayer === myPlayerId;
+  if (isMyTurn && rolls === 0) sndMyTurn();
   setStatus(isMyTurn ? 'Du bist dran – würfle!' : `${playerNames[currentPlayer]} ist dran...`);
   document.getElementById('btnRoll').disabled = !isMyTurn || rolls >= 3;
 }
