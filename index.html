@@ -682,13 +682,16 @@ function renderLeaderboard(snap) {
   }
   const entries = [];
   snap.forEach(child => entries.push(child.val()));
+  console.log('Entries:', JSON.stringify(entries));
   entries.sort((a, b) => b.score - a.score);
   const top = entries.slice(0, 50);
+  console.log('Top:', top.length);
   const medals = ['🥇','🥈','🥉'];
   let html = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr>';
   top.forEach((e, i) => {
     html += `<tr><td>${medals[i] || (i+1)}</td><td>${e.name}</td><td>${e.score}</td><td>${e.date}</td></tr>`;
   });
+  console.log('HTML rows:', top.length);
   table.innerHTML = html;
 }
 
