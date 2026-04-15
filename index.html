@@ -386,11 +386,10 @@ function chooseCategory(kat) {
 
   if (gameMode === 'online') {
     const players = playerNames.map((n, idx) => ({ name: n, scores: scorecards[idx] }));
-    const gameOver = players.every(p => Object.keys(p.scores).length >= 13);
     fbUpdate(fbRef(fbDb, `games/${roomCode}`), {
       players,
       currentPlayer: nextPlayer,
-      round: gameOver ? 14 : nextRound,
+      round: nextRound,
       dice: [0,0,0,0,0],
       kept: [false,false,false,false,false],
       rolls: 0,
@@ -678,6 +677,8 @@ function startOnlineRound(data) {
   rolls = data.rolls || 0;
   if (data.lastScored) lastScoredEntry = data.lastScored;
   if (round > 13) { showEnd(); if (fbListener) { fbListener(); fbListener = null; } document.getElementById('backToEnd').style.display = ''; return; }
+  // Noch nicht alle fertig? Prüfe ob aktueller Spieler noch Kategorien offen hat
+  if (isGameOver()) { showEnd(); if (fbListener) { fbListener(); fbListener = null; } document.getElementById('backToEnd').style.display = ''; return; }
   showScreen('game');
   renderAll();
   const isMyTurn = currentPlayer === myPlayerId;
