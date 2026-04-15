@@ -2,7 +2,7 @@
 
 Ein Kniffel-Spiel direkt im Browser – lokal, online oder gegen den Computer.
 
-**[▶ Jetzt spielen](https://adriangit05.github.io/kniffel/)**
+**[▶ Jetzt spielen](https://adriansgitt.github.io/kniffel/)**
 
 ## Features
 
