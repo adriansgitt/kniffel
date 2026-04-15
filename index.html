@@ -145,7 +145,7 @@
   </div>
   <div id="onlineSetup" style="display:none; text-align:center;">
     <div class="name-inputs" style="align-items:center;">
-      <input id="onlineName" placeholder="Dein Name" value="Spieler">
+      <input id="onlineName" placeholder="Dein Name" value="Spieler" onfocus="if(/^Spieler$/.test(this.value))this.value=''">
     </div>
     <button class="btn-lobby" onclick="sndStart(); createOnlineGame()">Neues Spiel erstellen</button>
     <br>
@@ -258,6 +258,7 @@ function updateNameInputs() {
     const inp = document.createElement('input');
     inp.placeholder = `Spieler ${i+1}`;
     inp.value = `Spieler ${i+1}`;
+    inp.onfocus = () => { if (/^Spieler(\s\d+)?$/.test(inp.value)) inp.value = ''; };
     inp.id = `name${i}`;
     c.appendChild(inp);
   }
@@ -500,17 +501,24 @@ function showEnd() {
   }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt }));
   res.sort((a, b) => b.score - a.score);
-  // Scores in Bestenliste speichern
+  // Scores in Bestenliste speichern (nur Top 3)
   if (window.fbDb) {
-    res.forEach(r => {
-      if (/^Spieler \d+$/.test(r.name)) return;
-      const entry = {
-        name: r.name,
-        score: r.score,
-        date: new Date().toLocaleString('de-DE')
-      };
-      const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
-      fbSet(newRef, entry);
+    fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
+      const entries = [];
+      if (snap.exists()) snap.forEach(child => entries.push(child.val()));
+      entries.sort((a, b) => b.score - a.score);
+      const minTop = entries.length >= 30 ? entries[29].score : 0;
+      res.forEach(r => {
+        if (/^Spieler(\s\d+)?$/.test(r.name)) return;
+        if (r.score <= minTop && entries.length >= 30) return;
+        const entry = {
+          name: r.name,
+          score: r.score,
+          date: new Date().toLocaleString('de-DE')
+        };
+        const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+        fbSet(newRef, entry);
+      });
     });
   }
   const div = document.getElementById('results');
@@ -663,6 +671,13 @@ function showLeaderboard() {
     snap.forEach(child => entries.push(child.val()));
     entries.sort((a, b) => b.score - a.score);
     const top = entries.slice(0, 50);
+    // Alte Einträge außerhalb Top 50 löschen
+    if (entries.length > 50) {
+      const keys = [];
+      snap.forEach(child => keys.push({ key: child.key, val: child.val() }));
+      keys.sort((a, b) => b.val.score - a.val.score);
+      keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
+    }
     const medals = ['🥇','🥈','🥉'];
     let html = '<tr><th>#</th><th>Name</th><th>Punkte</th><th>Datum</th></tr>';
     top.forEach((e, i) => {
