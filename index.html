@@ -140,6 +140,9 @@
   <div id="localSetup" style="display:flex; flex-direction:column; align-items:center;">
     <h2>Wie viele Spieler?</h2>
     <div class="player-count" id="playerCount"></div>
+    <div id="aiToggle" style="margin:8px 0;">
+      <label><input type="checkbox" id="aiCheckbox" onchange="sndClick()"> 🤖 Gegen Computer spielen</label>
+    </div>
     <div class="name-inputs" id="nameInputs"></div>
     <button class="btn-start" onclick="sndStart(); startGame()">Spiel starten!</button>
   </div>
@@ -177,6 +180,9 @@
     <table class="scorecard" id="scorecard"></table>
   </div>
   <div class="status" id="status"></div>
+  <div id="backToEnd" style="display:none; text-align:center; margin-top:10px;">
+    <button class="btn-back" onclick="showScreen('end')">← Zurück zum Ergebnis</button>
+  </div>
   <div class="dice-area">
     <div class="dice-row" id="diceRow"></div>
     <button class="btn-roll" id="btnRoll" onclick="roll()">🎲 Würfeln</button>
@@ -196,6 +202,7 @@
   <h1>🏆 Spiel beendet!</h1>
   <div id="results"></div>
   <button class="btn-restart" onclick="sndStart(); showMenu()">Neues Spiel</button>
+  <button class="btn-back" onclick="showScreen('game')" style="margin-top:10px">📊 Scorecard anzeigen</button>
 </div>
 
 <script>
@@ -237,7 +244,8 @@ let numPlayers = 1, playerNames = [], scorecards = [];
 let currentPlayer = 0, round = 1, dice = [0,0,0,0,0], kept = [false,false,false,false,false], rolls = 0;
 let gameMode = 'local'; // 'local' oder 'online'
 let roomCode = null, myPlayerId = null, isHost = false;
-let lastScoredEntry = null; // { player: index, category: name }
+let lastScoredEntry = null;
+let aiPlayer = -1;
 
 // Startmenü
 function initMenu() {
@@ -247,7 +255,7 @@ function initMenu() {
     const b = document.createElement('button');
     b.textContent = n;
     b.className = n === 1 ? 'selected' : '';
-    b.onclick = () => { sndClick(); numPlayers = n; document.querySelectorAll('.player-count button').forEach(x => x.className = ''); b.className = 'selected'; updateNameInputs(); };
+    b.onclick = () => { sndClick(); numPlayers = n; document.querySelectorAll('.player-count button').forEach(x => x.className = ''); b.className = 'selected'; updateNameInputs(); document.getElementById('aiToggle').style.display = n === 1 ? '' : 'none'; };
     pc.appendChild(b);
   }
   updateNameInputs();
@@ -276,6 +284,7 @@ function showMenu() {
   gameMode = 'local';
   window._leaderboardSaved = false;
   if (fbListener) { fbListener(); fbListener = null; }
+  document.getElementById('backToEnd').style.display = 'none';
   showScreen('menu');
   initMenu();
 }
@@ -284,9 +293,20 @@ function showMenu() {
 function startGame() {
   playerNames = [];
   scorecards = [];
-  for (let i = 0; i < numPlayers; i++) {
-    playerNames.push(document.getElementById(`name${i}`).value.trim() || `Spieler ${i+1}`);
+  const useAi = document.getElementById('aiCheckbox').checked && numPlayers === 1;
+  if (useAi) {
+    numPlayers = 2;
+    playerNames.push(document.getElementById('name0').value.trim() || 'Spieler 1');
+    playerNames.push('🤖 Computer');
     scorecards.push({});
+    scorecards.push({});
+    aiPlayer = 1;
+  } else {
+    aiPlayer = -1;
+    for (let i = 0; i < numPlayers; i++) {
+      playerNames.push(document.getElementById(`name${i}`).value.trim() || `Spieler ${i+1}`);
+      scorecards.push({});
+    }
   }
   currentPlayer = Math.floor(Math.random() * numPlayers);
   round = 1;
@@ -299,13 +319,20 @@ function newTurn() {
   rolls = 0;
   showScreen('game');
   renderAll();
-  setStatus(`${playerNames[currentPlayer]} ist dran – würfle!`);
+  if (currentPlayer === aiPlayer) {
+    setStatus('🤖 Computer denkt nach...');
+    document.getElementById('btnRoll').disabled = true;
+    setTimeout(aiTurn, 800);
+  } else {
+    setStatus(`${playerNames[currentPlayer]} ist dran – würfle!`);
+  }
 }
 
 // Würfeln
 function roll() {
   if (rolls >= 3) return;
   if (gameMode === 'online' && currentPlayer !== myPlayerId) return;
+  if (currentPlayer === aiPlayer) return;
   sndRoll();
   for (let i = 0; i < 5; i++) {
     if (!kept[i]) dice[i] = Math.floor(Math.random() * 6) + 1;
@@ -413,7 +440,7 @@ function renderAll() {
   document.getElementById('currentPlayer').textContent = `🎯 ${playerNames[currentPlayer]}`;
   document.getElementById('roundInfo').textContent = `Runde ${round} / 13`;
   document.getElementById('rollsLeft').textContent = `Würfe übrig: ${3 - rolls}`;
-  document.getElementById('btnRoll').disabled = rolls >= 3;
+  document.getElementById('btnRoll').disabled = rolls >= 3 || currentPlayer === aiPlayer;
 }
 
 function renderDice() {
@@ -458,7 +485,7 @@ function categoryRow(kat) {
     if (kat in sc) {
       const isLast = lastScoredEntry && lastScoredEntry.player === si && lastScoredEntry.category === kat;
       html += `<td class="scored${isLast ? ' last-scored' : ''}">${sc[kat]}</td>`;
-    } else if (si === currentPlayer && rolls > 0 && (gameMode === 'local' || si === myPlayerId)) {
+    } else if (si === currentPlayer && rolls > 0 && si !== aiPlayer && (gameMode === 'local' || si === myPlayerId)) {
       const preview = calcScore(dice, kat);
       html += `<td class="preview" onclick="chooseCategory('${kat}')">(${preview})</td>`;
     } else {
@@ -495,6 +522,7 @@ function setStatus(text) {
 
 // Endscreen
 function showEnd() {
+  document.getElementById('backToEnd').style.display = '';
   showScreen('end');
   sndEnd();
   // Online-Raum nach 60s löschen
@@ -512,7 +540,7 @@ function showEnd() {
     function saveToLeaderboard() {
       if (!window.fbDb) { setTimeout(saveToLeaderboard, 500); return; }
       res.forEach(r => {
-        if (/^Spieler(\s\d+)?$/.test(r.name) || !r.name.trim()) return;
+        if (/^Spieler(\s\d+)?$/.test(r.name) || !r.name.trim() || r.name === '🤖 Computer') return;
         const entry = {
           name: r.name,
           score: r.score,
@@ -646,7 +674,7 @@ function startOnlineRound(data) {
   kept = data.kept || [false,false,false,false,false];
   rolls = data.rolls || 0;
   if (data.lastScored) lastScoredEntry = data.lastScored;
-  if (round > 13) { showEnd(); if (fbListener) { fbListener(); fbListener = null; } return; }
+  if (round > 13) { showEnd(); if (fbListener) { fbListener(); fbListener = null; } document.getElementById('backToEnd').style.display = ''; return; }
   showScreen('game');
   renderAll();
   const isMyTurn = currentPlayer === myPlayerId;
@@ -729,6 +757,118 @@ function cleanupOldRooms() {
   });
 }
 setTimeout(cleanupOldRooms, 2000);
+
+// KI-Logik (schlau)
+function aiTurn() {
+  aiRoll(0);
+}
+
+function aiRoll(rollNum) {
+  if (rollNum >= 3) { aiChooseCategory(); return; }
+  sndRoll();
+  for (let i = 0; i < 5; i++) {
+    if (!kept[i]) dice[i] = Math.floor(Math.random() * 6) + 1;
+  }
+  rolls = rollNum + 1;
+  renderAll();
+  if (rolls < 3) {
+    kept = aiBestKeep();
+    setTimeout(() => { renderDice(); setTimeout(() => aiRoll(rollNum + 1), 600); }, 600);
+  } else {
+    setTimeout(aiChooseCategory, 600);
+  }
+}
+
+function aiCategoryValue(kat, d) {
+  const sc = scorecards[aiPlayer];
+  const score = calcScore(d, kat);
+  if (kat in sc) return -Infinity;
+
+  // Bonus-Tracking: wie viel fehlt noch?
+  let oben = 0, openUpper = 0;
+  UPPER.forEach(k => { if (k in sc) oben += sc[k]; else openUpper++; });
+  const bonusNeeded = Math.max(0, 63 - oben);
+  const bonusReachable = openUpper > 0 && bonusNeeded / openUpper <= 4;
+
+  // Gewichtung: Score + strategischer Bonus
+  let value = score;
+
+  // Oberer Block: Bonus-Fortschritt belohnen
+  if (kat in ZAHL) {
+    const z = ZAHL[kat];
+    const target = z * 3; // 3x die Zahl = Bonus-Schnitt
+    if (bonusReachable && score >= target) value += 8;
+    if (score >= z * 4) value += 5;
+  }
+
+  // Wertvolle Kategorien schützen (nicht mit 0 belegen)
+  if (score === 0) {
+    if (kat === 'Kniffel') value -= 5;
+    if (kat === 'Große Straße') value -= 4;
+    if (kat === 'Full House') value -= 3;
+    if (kat === 'Kleine Straße') value -= 2;
+  }
+
+  // Hohe Scores belohnen
+  if (kat === 'Kniffel' && score === 50) value += 15;
+  if (kat === 'Große Straße' && score === 40) value += 10;
+  if (kat === 'Full House' && score === 25) value += 5;
+
+  return value;
+}
+
+function aiBestKeep() {
+  const sc = scorecards[aiPlayer];
+  let bestKept = [false,false,false,false,false];
+  let bestValue = -999;
+
+  // Alle 32 Behalte-Kombinationen durchprobieren
+  for (let mask = 0; mask < 32; mask++) {
+    const tryKept = [!!(mask&1), !!(mask&2), !!(mask&4), !!(mask&8), !!(mask&16)];
+    // Simuliere: was ist der beste Kategorie-Wert mit diesen gehaltenen Würfeln?
+    const keptDice = dice.filter((d,i) => tryKept[i]);
+    const numFree = 5 - keptDice.length;
+
+    if (numFree === 0) {
+      // Alle behalten: bewerte direkt
+      let maxVal = -999;
+      ALL.forEach(kat => {
+        const v = aiCategoryValue(kat, dice);
+        if (v > maxVal) maxVal = v;
+      });
+      if (maxVal > bestValue) { bestValue = maxVal; bestKept = tryKept; }
+    } else {
+      // Erwartungswert schätzen mit Stichproben
+      let totalVal = 0;
+      const samples = 20;
+      for (let s = 0; s < samples; s++) {
+        const simDice = [...dice];
+        for (let i = 0; i < 5; i++) {
+          if (!tryKept[i]) simDice[i] = Math.floor(Math.random() * 6) + 1;
+        }
+        let maxVal = -999;
+        ALL.forEach(kat => {
+          const v = aiCategoryValue(kat, simDice);
+          if (v > maxVal) maxVal = v;
+        });
+        totalVal += maxVal;
+      }
+      const avgVal = totalVal / samples;
+      if (avgVal > bestValue) { bestValue = avgVal; bestKept = tryKept; }
+    }
+  }
+  return bestKept;
+}
+
+function aiChooseCategory() {
+  let bestKat = null, bestValue = -Infinity;
+  ALL.forEach(kat => {
+    if (kat in scorecards[aiPlayer]) return;
+    const v = aiCategoryValue(kat, dice);
+    if (v > bestValue) { bestValue = v; bestKat = kat; }
+  });
+  if (bestKat) chooseCategory(bestKat);
+}
 
 // Init
 initMenu();
