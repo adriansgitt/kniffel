@@ -157,7 +157,7 @@
   </div>
   <div id="onlineSetup" style="display:none; text-align:center;">
     <div class="name-inputs" style="align-items:center;">
-      <input id="onlineName" placeholder="Dein Name" value="Spieler" onfocus="if(/^Spieler$/.test(this.value))this.value=''">
+      <input id="onlineName" placeholder="Dein Name" value="" onfocus="if(/^Spieler$/.test(this.value))this.value=''" onblur="localStorage.setItem('onlineName',this.value)">
     </div>
     <button class="btn-lobby" onclick="sndStart(); createOnlineGame()">Neues Spiel erstellen</button>
     <br>
@@ -202,8 +202,8 @@
 <!-- Bestenliste -->
 <div id="leaderboard" class="screen">
   <h1>🏆 Bestenliste</h1>
-  <table class="lb-table" id="lbTable"></table>
   <button class="btn-back" onclick="if(fbLeaderboardListener){fbLeaderboardListener();fbLeaderboardListener=null;} showMenu()">← Zurück</button>
+  <table class="lb-table" id="lbTable"></table>
 </div>
 
 <!-- Endscreen -->
@@ -276,8 +276,9 @@ function updateNameInputs() {
   for (let i = 0; i < numPlayers; i++) {
     const inp = document.createElement('input');
     inp.placeholder = `Spieler ${i+1}`;
-    inp.value = `Spieler ${i+1}`;
+    inp.value = localStorage.getItem(`playerName${i}`) || `Spieler ${i+1}`;
     inp.onfocus = () => { if (/^Spieler(\s\d+)?$/.test(inp.value)) inp.value = ''; };
+    inp.onblur = () => { localStorage.setItem(`playerName${i}`, inp.value); };
     inp.id = `name${i}`;
     c.appendChild(inp);
   }
@@ -741,7 +742,7 @@ function renderLeaderboard(snap) {
   top.forEach((e, i) => {
     const prob = scoreProbability(e.score) * 100;
     const probStr = prob < 0.1 ? prob.toFixed(2) + '%' : prob < 1 ? prob.toFixed(1) + '%' : prob.toFixed(0) + '%';
-    const scBtn = (i < 3 && e.scorecard) ? ` <span style="cursor:pointer" onclick='showScorecardPopup(${JSON.stringify(e)})'>📊</span>` : '';
+    const scBtn = e.scorecard ? ` <span style="cursor:pointer" onclick='showScorecardPopup(${JSON.stringify(e)})'>📊</span>` : '';
     html += `<tr><td>${medals[i] || (i+1)}</td><td>${e.name}${scBtn}</td><td>${e.score}</td><td>${probStr}</td><td>${e.date}</td></tr>`;
   });
   table.innerHTML = html;
@@ -902,6 +903,7 @@ function aiChooseCategory() {
 }
 
 // Init
+document.getElementById('onlineName').value = localStorage.getItem('onlineName') || 'Spieler';
 initMenu();
 </script>
 </body>
