@@ -607,6 +607,8 @@ function selectMode(mode) {
 let fbListener = null;
 
 function createOnlineGame() {
+  if (!window.fbDb) { alert('Verbindung wird hergestellt, bitte nochmal versuchen.'); return; }
+  gameMode = 'online';
   roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   isHost = true;
   myPlayerId = 0;
@@ -624,6 +626,8 @@ function createOnlineGame() {
 }
 
 function joinOnlineGame() {
+  if (!window.fbDb) { alert('Verbindung wird hergestellt, bitte nochmal versuchen.'); return; }
+  gameMode = 'online';
   roomCode = document.getElementById('joinCode').value.trim().toUpperCase();
   if (!roomCode || roomCode.length < 4) { alert('Bitte gültigen Code eingeben!'); return; }
   isHost = false;
