@@ -211,6 +211,7 @@
   <h1>🏆 Spiel beendet!</h1>
   <div id="results"></div>
   <button class="btn-restart" onclick="sndStart(); showMenu()">Neues Spiel</button>
+  <button class="btn-restart" id="btnRematch" style="display:none; background:#1565C0" onclick="sndStart(); rematch()">🔄 Nochmal spielen</button>
   <button class="btn-back" onclick="showScreen('game')" style="margin-top:10px">📊 Scorecard anzeigen</button>
 </div>
 
@@ -538,15 +539,16 @@ function setStatus(text) {
 // Endscreen
 function showEnd() {
   document.getElementById('backToEnd').style.display = '';
+  document.getElementById('btnRematch').style.display = (gameMode === 'online' && roomCode) ? '' : 'none';
   showScreen('end');
   sndEnd();
-  // Online-Raum nach 60s löschen
+  // Online-Raum nach 5min löschen (falls kein Rematch)
   if (gameMode === 'online' && roomCode) {
     if (fbListener) { fbListener(); fbListener = null; }
-    setTimeout(() => {
-      fbRemove(fbRef(fbDb, `games/${roomCode}`));
-      roomCode = null;
-    }, 60000);
+    if (window._roomTimeout) clearTimeout(window._roomTimeout);
+    window._roomTimeout = setTimeout(() => {
+      if (roomCode) { fbRemove(fbRef(fbDb, `games/${roomCode}`)); roomCode = null; }
+    }, 300000);
   }
   const res = playerNames.map((n, i) => ({ name: n, score: getTotal(i).gesamt, scorecard: scorecards[i] }));
   res.sort((a, b) => b.score - a.score);
@@ -710,6 +712,35 @@ function listenGame() {
     const data = snap.val();
     if (!data) return;
     if (data.status === 'playing') startOnlineRound(data);
+  });
+}
+
+function rematch() {
+  if (!roomCode) return;
+  // Scores zurücksetzen in Firebase
+  fbGet(fbRef(fbDb, `games/${roomCode}`)).then(snap => {
+    if (!snap.exists()) { showMenu(); return; }
+    const data = snap.val();
+    const players = (data.players || []).map(p => ({ name: p.name, scores: {} }));
+    fbUpdate(fbRef(fbDb, `games/${roomCode}`), {
+      players,
+      currentPlayer: Math.floor(Math.random() * players.length),
+      round: 1,
+      dice: [0,0,0,0,0],
+      kept: [false,false,false,false,false],
+      rolls: 0,
+      status: 'playing',
+      lastScored: null
+    });
+    // Listener neu starten
+    if (!fbListener) {
+      const roomRef = fbRef(fbDb, `games/${roomCode}`);
+      fbListener = fbOnValue(roomRef, snap => {
+        const d = snap.val();
+        if (!d) { showMenu(); return; }
+        if (d.status === 'playing') startOnlineRound(d);
+      });
+    }
   });
 }
 
