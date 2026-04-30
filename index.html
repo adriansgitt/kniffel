@@ -556,6 +556,7 @@ function showEnd() {
   if (gameMode === 'local' || isHost) {
     function saveToLeaderboard() {
       if (!window.fbDb) { setTimeout(saveToLeaderboard, 500); return; }
+      let saveCount = 0;
       res.forEach(r => {
         if (/^Spieler(\s\d+)?$/.test(r.name) || !r.name.trim() || r.name === '🤖 Computer') return;
         const entry = {
@@ -565,19 +566,24 @@ function showEnd() {
           scorecard: r.scorecard || null
         };
         const newRef = fbRef(fbDb, 'leaderboard/' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
-        fbSet(newRef, entry);
-      });
-      // Cleanup: nach dem Speichern Einträge über 50 löschen
-      setTimeout(() => {
-        fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
-          if (!snap.exists()) return;
-          const keys = [];
-          snap.forEach(child => { keys.push({ key: child.key, score: child.val().score }); });
-          if (keys.length <= 50) return;
-          keys.sort((a, b) => b.score - a.score);
-          keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
+        fbSet(newRef, entry).then(() => {
+          console.log('Leaderboard gespeichert:', r.name, r.score);
+          saveCount++;
+          // Cleanup erst wenn alle gespeichert sind
+          if (saveCount >= res.filter(x => !/^Spieler(\s\d+)?$/.test(x.name) && x.name.trim() && x.name !== '🤖 Computer').length) {
+            setTimeout(() => {
+              fbGet(fbRef(fbDb, 'leaderboard')).then(snap => {
+                if (!snap.exists()) return;
+                const keys = [];
+                snap.forEach(child => { keys.push({ key: child.key, score: child.val().score }); });
+                if (keys.length <= 50) return;
+                keys.sort((a, b) => b.score - a.score);
+                keys.slice(50).forEach(k => fbRemove(fbRef(fbDb, `leaderboard/${k.key}`)));
+              });
+            }, 1000);
+          }
         });
-      }, 2000);
+      });
     }
     saveToLeaderboard();
   }
